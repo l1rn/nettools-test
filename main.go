@@ -30,10 +30,27 @@ func goPacketCallback(info *C.struct_packet_info){
 	)
 }
 
-func main(){
+func chooseInterface() string {
 	C.print_possible_devices()
-	iface := "wlp4s0"
+	var key int;
+	fmt.Printf("Choose iface (1: default): ")
+	fmt.Scan(&key)
 
+	cstr := C.choose_device(C.int(key))
+	if cstr == nil {
+		fmt.Println("Failed to get device or invalid selection")
+		return "wlp4s0"
+	}
+
+	defer C.free(unsafe.Pointer(cstr))
+
+	deviceName := C.GoString(cstr)
+	fmt.Printf("You chose key %d: %s\n", key, deviceName)
+	return deviceName
+}
+
+func main(){
+	iface := chooseInterface()
 	if len(os.Args) > 1 {
 		iface = os.Args[1]
 	}

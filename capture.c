@@ -87,8 +87,9 @@ void print_possible_devices(){
 	}	
 
 	printf("Devices: \n");
+	size_t i = 1;
 	for(pcap_if_t *d = devices; d != NULL; d = d->next){
-		printf("- %s\n", d->name);
+		printf("- [%d]%s\n", i, d->name);
 		if(d->description) {
 			printf("   Description: %s\n", d->description);
 		}
@@ -106,7 +107,37 @@ void print_possible_devices(){
 				printf("   IPv4: %s\n");
 			}
 		}
+		i++;
 		printf("\n");
 	}
+
 	pcap_freealldevs(devices);
+}
+
+char *choose_device(int key) {
+	pcap_if_t *devices;
+	char errbuf[PCAP_ERRBUF_SIZE];
+
+	if(pcap_findalldevs(&devices, errbuf) == -1){
+		fprintf(stderr, "Error to find devices: %s\n", errbuf);
+		return NULL;
+	}
+	size_t i = 1;
+	char *result = NULL;
+
+	for(pcap_if_t *d = devices; d != NULL; d = d->next){
+		if(i == key){
+			result = strdup(d->name);
+			break;
+		}
+		i++;
+	}
+
+	
+	pcap_freealldevs(devices);
+
+	if(!result){
+		printf("Error: not found device by this key");
+	}
+	return result;
 }
