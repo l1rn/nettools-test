@@ -21,5 +21,5 @@ struct callback_data {
 
 void handler(unsigned char *user, const struct pcap_pkthdr *h, const unsigned char *bytes);
 int start_capture(const char* iface, packet_cb cb);
-
+void print_possible_devices();
 #endif

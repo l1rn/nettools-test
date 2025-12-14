@@ -1,11 +1,14 @@
 #include "capture.h"
 #include <pcap.h>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <netinet/ether.h>
+#include <netinet/ether.h> 
 
 void handler(
 	u_char *user,
@@ -23,6 +26,7 @@ void handler(
 		return;
 
 	struct iphdr *ip = (struct iphdr *)(bytes + sizeof(struct ether_header));
+	printf("protocol: %d\n", ip->protocol);
 	if(ip->protocol != IPPROTO_TCP)
 		return;
 
@@ -71,4 +75,38 @@ int start_capture(const char* iface, packet_cb cb){
 	pcap_close(handle);
 	
 	return 0;
+}
+
+void print_possible_devices(){
+	pcap_if_t *devices;
+	char errbuf[PCAP_ERRBUF_SIZE];
+
+	if(pcap_findalldevs(&devices, errbuf) == -1){
+		fprintf(stderr, "Error to capture devices: %s\n", errbuf);
+		return;
+	}	
+
+	printf("Devices: \n");
+	for(pcap_if_t *d = devices; d != NULL; d = d->next){
+		printf("- %s\n", d->name);
+		if(d->description) {
+			printf("   Description: %s\n", d->description);
+		}
+
+		for(pcap_addr_t *a = d->addresses; a != NULL; a = a->next){
+			if(a->addr->sa_family == AF_INET){
+				char ip[INET_ADDRSTRLEN];
+				inet_ntop(
+					AF_INET, 
+					&((struct sockaddr_in*)a->addr)->sin_addr,
+					ip,
+					INET_ADDRSTRLEN
+				);
+
+				printf("   IPv4: %s\n");
+			}
+		}
+		printf("\n");
+	}
+	pcap_freealldevs(devices);
 }

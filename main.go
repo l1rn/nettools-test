@@ -31,7 +31,8 @@ func goPacketCallback(info *C.struct_packet_info){
 }
 
 func main(){
-	iface := "eth0"
+	C.print_possible_devices()
+	iface := "wlp4s0"
 
 	if len(os.Args) > 1 {
 		iface = os.Args[1]
@@ -41,7 +42,7 @@ func main(){
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
+	fmt.Println("Start capturing...")
 	go func() {
 		C.start_capture(
 			ciface,
@@ -50,4 +51,6 @@ func main(){
 	}()
 
 	<-sigChan
+
+	fmt.Println("End capturing...")
 }
