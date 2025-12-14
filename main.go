@@ -5,10 +5,10 @@ package main
 #include "capture.h"
 #include <stdlib.h>
 
-extern void goPacketCallback(int len);
+extern void goPacketCallback(struct packet_info *info);
 
-static void packet_bridge(int len){
-	goPacketCallback(len);
+static void packet_bridge(struct packet_info *info){
+	goPacketCallback(info);
 }
 */
 import "C"
@@ -22,8 +22,12 @@ import (
 )
 
 //export goPacketCallback
-func goPacketCallback(len C.int){
-	fmt.Println("packet length: ", int(len))
+func goPacketCallback(info *C.struct_packet_info){
+	fmt.Printf(
+		"TCP %d -> %d\n",
+		int(info.src_port),
+		int(info.dst_port),
+	)
 }
 
 func main(){

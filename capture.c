@@ -3,6 +3,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/ether.h>
 
 void handler(
 	u_char *user,
@@ -10,9 +13,40 @@ void handler(
 	const u_char *bytes
 ) {
 	struct callback_data *data = (struct callback_data *)user;
-	if(data && data ->cb){
-		data->cb(h->len);
-	}
+	if(!data || !data->cb) return;
+
+	if(h->caplen < sizeof(struct ether_header) + sizeof(struct iphdr))
+		return;
+
+	struct ether_header *eth = (struct ether_header *)bytes;
+	if(ntohs(eth->ether_type) != ETHERTYPE_IP)
+		return;
+
+	struct iphdr *ip = (struct iphdr *)(bytes + sizeof(struct ether_header));
+	if(ip->protocol != IPPROTO_TCP)
+		return;
+
+	int ip_header_len = ip->ihl * 4;
+	if(ip_header_len < sizeof(struct iphdr))
+		return;
+	
+	if(h->caplen < sizeof(struct ether_header) + ip_header_len + sizeof(struct tcphdr))
+		return;
+
+	struct tcphdr *tcp = (struct tcphdr *)(
+		bytes + sizeof(struct ether_header) + ip_header_len
+	);
+
+	struct packet_info info;
+	memset(&info, 0, sizeof(info));
+
+	info.src_ip	= ip->saddr;
+	info.dst_ip 	= ip->daddr;
+	info.src_port	= ntohs(tcp->source);
+	info.dst_port 	= ntohs(tcp->dest);
+	info.proto 	= ip->protocol;
+
+	data->cb(&info);
 }
 
 int start_capture(const char* iface, packet_cb cb){
@@ -35,5 +69,6 @@ int start_capture(const char* iface, packet_cb cb){
 
 	pcap_loop(handle, 0, handler, (u_char*)data);
 	pcap_close(handle);
+	
 	return 0;
 }

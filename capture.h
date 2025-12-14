@@ -1,8 +1,19 @@
 #ifndef CAPTURE_H
 #define CAPTURE_H
 
+#include <stdint.h>
+
 typedef struct pcap_pkthdr pcap_pkthdr_t;
-typedef void (*packet_cb)(int len);
+
+struct packet_info {
+	uint32_t src_ip;
+	uint32_t dst_ip;
+	uint16_t src_port;
+	uint16_t dst_port;
+	uint8_t  proto;
+};
+
+typedef void (*packet_cb)(struct packet_info *info);
 
 struct callback_data {
 	packet_cb cb;
