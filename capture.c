@@ -1,14 +1,16 @@
 #include "capture.h"
+
 #include <pcap.h>
 
 #include <stdio.h>
-#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <netinet/ether.h> 
+
 
 void handler(
 	u_char *user,
@@ -26,8 +28,8 @@ void handler(
 		return;
 
 	struct iphdr *ip = (struct iphdr *)(bytes + sizeof(struct ether_header));
-	printf("protocol: %d\n", ip->protocol);
-	if(ip->protocol != IPPROTO_TCP)
+
+	if(ip->protocol != IPPROTO_TCP && ip->protocol != IPPROTO_UDP)
 		return;
 
 	int ip_header_len = ip->ihl * 4;
@@ -36,19 +38,34 @@ void handler(
 	
 	if(h->caplen < sizeof(struct ether_header) + ip_header_len + sizeof(struct tcphdr))
 		return;
-
-	struct tcphdr *tcp = (struct tcphdr *)(
-		bytes + sizeof(struct ether_header) + ip_header_len
-	);
-
+	
 	struct packet_info info;
+	
 	memset(&info, 0, sizeof(info));
+	
+	if(ip->protocol == IPPROTO_TCP){
+		struct tcphdr *tcp = (struct tcphdr *)(
+			bytes + sizeof(struct ether_header) + ip_header_len
+		);
 
-	info.src_ip	= ip->saddr;
-	info.dst_ip 	= ip->daddr;
-	info.src_port	= ntohs(tcp->source);
-	info.dst_port 	= ntohs(tcp->dest);
-	info.proto 	= ip->protocol;
+		info.src_ip	= ip->saddr;
+		info.dst_ip 	= ip->daddr;
+		info.src_port	= ntohs(tcp->source);
+		info.dst_port 	= ntohs(tcp->dest);
+		info.proto 	= ip->protocol;
+	}
+
+	if(ip->protocol == IPPROTO_UDP){
+		struct udphdr *udp = (struct udphdr *)(
+			bytes + sizeof(struct ether_header) + ip_header_len
+		);
+		
+		info.src_ip 	= ip->saddr;
+		info.dst_ip 	= ip->daddr;
+		info.src_port 	= ntohs(udp->source);
+		info.dst_port	= ntohs(udp->dest);
+		info.proto 	= ip->protocol;
+	}
 
 	data->cb(&info);
 }
@@ -87,9 +104,9 @@ void print_possible_devices(){
 	}	
 
 	printf("Devices: \n");
-	size_t i = 1;
+	short int i = 1;
 	for(pcap_if_t *d = devices; d != NULL; d = d->next){
-		printf("- [%d]%s\n", i, d->name);
+		printf("- [%d] %s\n", i, d->name);
 		if(d->description) {
 			printf("   Description: %s\n", d->description);
 		}
@@ -104,7 +121,7 @@ void print_possible_devices(){
 					INET_ADDRSTRLEN
 				);
 
-				printf("   IPv4: %s\n");
+				printf("   IPv4: %s\n", ip);
 			}
 		}
 		i++;
@@ -122,7 +139,7 @@ char *choose_device(int key) {
 		fprintf(stderr, "Error to find devices: %s\n", errbuf);
 		return NULL;
 	}
-	size_t i = 1;
+	short int i = 1;
 	char *result = NULL;
 
 	for(pcap_if_t *d = devices; d != NULL; d = d->next){

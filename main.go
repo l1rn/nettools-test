@@ -4,6 +4,7 @@ package main
 #cgo LDFLAGS: -lpcap
 #include "capture.h"
 #include <stdlib.h>
+#include <netinet/ip.h>
 
 extern void goPacketCallback(struct packet_info *info);
 
@@ -21,10 +22,33 @@ import (
 	"unsafe"
 )
 
+func protoName(info *C.struct_packet_info) string{
+	if info.proto == C.IPPROTO_TCP {
+		if info.dst_port == 443 || info.src_port == 443 {
+			return "TLS"
+		}
+		if info.dst_port == 80 || info.src_port == 80 {
+			return "HTTP"
+		}
+		return "TCP"
+	}
+	if info.proto == C.IPPROTO_UDP {
+		if info.dst_port == 53 || info.src_port == 53 {
+			return "DNS"
+		}
+		if info.dst_port == 443 || info.src_port == 443{
+			return "QUIC"
+		}
+		return "UDP"
+	}
+	return "UNKNOWN"
+}
+
 //export goPacketCallback
 func goPacketCallback(info *C.struct_packet_info){
+	fmt.Println(protoName(info))
 	fmt.Printf(
-		"TCP %d -> %d\n",
+		"%d -> %d\n",
 		int(info.src_port),
 		int(info.dst_port),
 	)
