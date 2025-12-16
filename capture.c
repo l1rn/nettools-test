@@ -1,5 +1,6 @@
 #include "capture.h"
 #include "bridge.h"
+#include "dns.h"
 
 #include <pcap.h>
 
@@ -120,10 +121,10 @@ void handler(
 			+ tcp_header_len;
 
 		int payload_len = h->caplen - (payload - bytes);
-
+		
 		if(payload <= 0) 
 			return;
-
+		
 		if(info.src_port == 443 || info.dst_port == 443){
 			parse_tls_sni(payload, payload_len);
 		}
@@ -134,13 +135,26 @@ void handler(
 			bytes + sizeof(struct ether_header) + ip_header_len
 		);
 		
+		uint16_t src = ntohs(udp->source);
+		uint16_t dst = ntohs(udp->dest);
+		
 		info.src_ip 	= ip->saddr;
 		info.dst_ip 	= ip->daddr;
-		info.src_port 	= ntohs(udp->source);
-		info.dst_port	= ntohs(udp->dest);
+		info.src_port 	= src;
+		info.dst_port	= dst;
 		info.proto 	= ip->protocol;
-	}
+		
+		if(src == 53 || dst == 53){
+			const unsigned char *dns =
+				bytes
+				+ sizeof(struct ether_header)
+				+ ip_header_len
+				+ sizeof(struct udphdr);
 
+			int dns_len = h->caplen - (dns - bytes);
+			parse_dns(dns, dns_len);
+		}
+	}
 	data->cb(&info);
 }
 

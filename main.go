@@ -42,6 +42,7 @@ func protoName(info *C.struct_packet_info) string {
 }
 
 var packetChan = make(chan map[string]interface{}, 1000)
+var dnsChan = make(chan string, 1000)
 
 func startPacketForward() {
 	for packet := range packetChan {
@@ -84,6 +85,22 @@ func goPacketCallback(info *C.struct_packet_info) {
 	}
 }
 
+//export goDNSCallback
+func goDNSCallback(domain *C.char){
+	d := C.GoString(domain)
+
+	select {
+	case dnsChan <- d:
+	default:
+	}
+}
+
+func startDNSConsumer() {
+	for d := range dnsChan {
+		fmt.Println("DNS: ", d)
+	}
+}
+
 func chooseInterface() string {
 	C.print_possible_devices()
 	var key int
@@ -117,6 +134,7 @@ func main() {
 	time.Sleep(100 * time.Millisecond)
 
 	fmt.Println("Start capturing...")
+	go startDNSConsumer()
 
 	go func() {
 		C.start_capture(
@@ -125,9 +143,11 @@ func main() {
 		)
 	}()
 
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 	close(packetChan)
+	close(dnsChan)
 	fmt.Println("End capturing...")
 }
