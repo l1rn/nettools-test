@@ -1,16 +1,12 @@
 package main
 
 /*
+#cgo CFLAGS: -I.
 #cgo LDFLAGS: -lpcap
 #include "capture.h"
+#include "bridge.h"
 #include <stdlib.h>
 #include <netinet/ip.h>
-
-extern void goPacketCallback(struct packet_info *info);
-
-static void packet_bridge(struct packet_info *info){
-	goPacketCallback(info);
-}
 */
 import "C"
 
@@ -60,12 +56,18 @@ func startPacketForward() {
 //export goPacketCallback
 func goPacketCallback(info *C.struct_packet_info) {
 	srcIP := fmt.Sprintf("%d.%d.%d.%d",
-		byte(info.src_ip>>24), byte(info.src_ip>>16),
-		byte(info.src_ip>>8), byte(info.src_ip))
+		byte(info.src_ip>>24), 
+		byte(info.src_ip>>16),
+		byte(info.src_ip>>8), 
+		byte(info.src_ip),
+	)
 
 	dstIP := fmt.Sprintf("%d.%d.%d.%d",
-		byte(info.dst_ip>>24), byte(info.dst_ip>>16),
-		byte(info.dst_ip>>8), byte(info.dst_ip))
+		byte(info.dst_ip>>24), 
+		byte(info.dst_ip>>16),
+		byte(info.dst_ip>>8), 
+		byte(info.dst_ip),
+	)
 
 	packetData := map[string]interface{}{
 		"src_ip":    srcIP,
@@ -119,7 +121,7 @@ func main() {
 	go func() {
 		C.start_capture(
 			ciface,
-			(C.packet_cb)(C.goPacketCallback),
+			nil,
 		)
 	}()
 

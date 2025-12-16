@@ -3,7 +3,17 @@
 
 #include <stdint.h>
 
+#define MAX_NAME 256
+
 typedef struct pcap_pkthdr pcap_pkthdr_t;
+
+enum app_proto {
+	APP_UNKNOWN = 0, 
+	APP_HTTP,
+	APP_TLS,
+	APP_DNS,
+	APP_QUIC
+};
 
 struct packet_info {
 	uint32_t src_ip;
@@ -11,6 +21,8 @@ struct packet_info {
 	uint16_t src_port;
 	uint16_t dst_port;
 	uint8_t  proto;
+	uint8_t  app;
+	char     name[MAX_NAME];
 };
 
 typedef void (*packet_cb)(struct packet_info *info);

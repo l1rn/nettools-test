@@ -1,4 +1,5 @@
 #include "capture.h"
+#include "bridge.h"
 
 #include <pcap.h>
 
@@ -159,7 +160,7 @@ int start_capture(const char* iface, packet_cb cb){
 		return -1;
 	}
 
-	data->cb = cb;
+	data->cb = packet_bridge;
 
 	pcap_loop(handle, 0, handler, (u_char*)data);
 	pcap_close(handle);
