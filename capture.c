@@ -11,6 +11,64 @@
 #include <netinet/udp.h>
 #include <netinet/ether.h> 
 
+#include <arpa/inet.h>
+
+static void parse_tls_sni(
+	const u_char *payload,
+	int payload_len
+){
+	if(payload_len < 5)
+		return;
+
+	if(payload[0] != 0x16)
+		return;
+
+	if(payload_len < 6 || payload[5] != 0x01)
+		return;
+
+	int pos = 5;
+	pos += 4;
+	pos += 2 + 32;
+	if(pos >= payload_len) return;
+
+	int session_len = payload[pos];
+	pos += 1 + session_len;
+	if(pos >= payload_len) return;
+
+	int cipher_len = (payload[pos] << 8) | payload[pos+1];
+	pos += 2 + cipher_len;
+	if(pos >= payload_len) return;
+
+	int comp_len = payload[pos];
+	pos += 1 + comp_len;
+	if(pos >= payload_len) return;
+
+	int ext_len = (payload[pos] << 8) | payload[pos+1];
+	pos += 2;
+
+	int end = pos + ext_len;
+	while(pos + 4 <= end && pos + 4 <= payload_len){
+		uint16_t type = (payload[pos] << 8) | payload[pos+1];
+		uint16_t len = (payload[pos+2] << 8) | payload[pos+3];
+		pos += 4;
+
+		if(type == 0x0000) {
+			if(pos + 5 > payload_len)
+				return;
+			
+			int name_len = (payload[pos+3] << 8) | payload[pos+4];
+			if(name_len <= 0 || name_len > 255)
+				return;
+			
+			char sni[256] = {0};
+			memcpy(sni, payload + pos + 5, name_len);
+			printf("TLS SNI: %s\n", sni);
+			return;
+		}
+
+		pos += len;
+	}
+}
 
 void handler(
 	u_char *user,
@@ -47,12 +105,27 @@ void handler(
 		struct tcphdr *tcp = (struct tcphdr *)(
 			bytes + sizeof(struct ether_header) + ip_header_len
 		);
+		int tcp_header_len = tcp->doff * 4;
 
 		info.src_ip	= ip->saddr;
 		info.dst_ip 	= ip->daddr;
 		info.src_port	= ntohs(tcp->source);
 		info.dst_port 	= ntohs(tcp->dest);
 		info.proto 	= ip->protocol;
+		
+		const u_char *payload = bytes 
+			+ sizeof(struct ether_header)
+			+ ip_header_len
+			+ tcp_header_len;
+
+		int payload_len = h->caplen - (payload - bytes);
+
+		if(payload <= 0) 
+			return;
+
+		if(info.src_port == 443 || info.dst_port == 443){
+			parse_tls_sni(payload, payload_len);
+		}
 	}
 
 	if(ip->protocol == IPPROTO_UDP){
