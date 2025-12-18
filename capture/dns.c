@@ -1,5 +1,5 @@
 #include "dns.h"
-#include "bridge.h"
+#include "../bridge/bridge.h"
 
 #include <stdint.h>
 #include <string.h>

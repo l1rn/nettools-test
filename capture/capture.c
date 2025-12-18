@@ -1,5 +1,4 @@
 #include "capture.h"
-#include "bridge.h"
 #include "dns.h"
 
 #include <pcap.h>
@@ -15,10 +14,16 @@
 
 #include <arpa/inet.h>
 
+static packet_cb_t G_packet_cb = NULL;
+static dns_cb_t G_dns_cb = NULL;
+
 static void parse_tls_sni(
 	const u_char *payload,
-	int payload_len
+	int payload_len,
+	struct packet_info *info
 ){
+	info->sni[0] = '\0';
+
 	if(payload_len < 5)
 		return;
 
@@ -30,7 +35,8 @@ static void parse_tls_sni(
 
 	int pos = 5;
 	pos += 4;
-	pos += 2 + 32;
+	pos += 34;
+
 	if(pos >= payload_len) return;
 
 	int session_len = payload[pos];
@@ -62,9 +68,8 @@ static void parse_tls_sni(
 			if(name_len <= 0 || name_len > 255)
 				return;
 			
-			char sni[256] = {0};
-			memcpy(sni, payload + pos + 5, name_len);
-			printf("TLS SNI: %s\n", sni);
+			memcpy(info->sni, payload + pos + 5, name_len);
+			info->sni[name_len] = '\0';
 			return;
 		}
 
@@ -126,7 +131,7 @@ void handler(
 			return;
 		
 		if(info.src_port == 443 || info.dst_port == 443){
-			parse_tls_sni(payload, payload_len);
+			parse_tls_sni(payload, payload_len, &info);
 		}
 	}
 
@@ -158,10 +163,13 @@ void handler(
 	data->cb(&info);
 }
 
-int start_capture(const char* iface, packet_cb cb){
+int start_capture(const char* iface, packet_cb_t p_cb, dns_cb_t d_cb){
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *handle;
 	struct callback_data *data;
+
+	G_packet_cb = p_cb;
+	G_dns_cb = d_cb;
 
 	handle = pcap_open_live(iface, 65535, 1, 1000, errbuf);
 	if(!handle){

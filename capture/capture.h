@@ -7,32 +7,24 @@
 
 typedef struct pcap_pkthdr pcap_pkthdr_t;
 
-enum app_proto {
-	APP_UNKNOWN = 0, 
-	APP_HTTP,
-	APP_TLS,
-	APP_DNS,
-	APP_QUIC
-};
-
 struct packet_info {
 	uint32_t src_ip;
 	uint32_t dst_ip;
 	uint16_t src_port;
 	uint16_t dst_port;
 	uint8_t  proto;
-	uint8_t  app;
-	char     name[MAX_NAME];
+	char     sni[MAX_NAME];
 };
 
-typedef void (*packet_cb)(struct packet_info *info);
+typedef void (*packet_cb_t)(struct packet_info*);
+typedef void (*dns_cb_t)(const char*);
 
 struct callback_data {
 	packet_cb cb;
 };
 
 void 	handler(unsigned char *user, const struct pcap_pkthdr *h, const unsigned char *bytes);
-int 	start_capture(const char* iface, packet_cb cb);
+int 	start_capture(const char* iface, packet_cb_t p_cb, dns_cb_t d_cb);
 void 	print_possible_devices();
 char* 	choose_device(int key);
 #endif
