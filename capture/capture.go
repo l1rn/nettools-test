@@ -5,13 +5,57 @@ package capture
 #include "capture.h"
 #include <stdlib.h>
 #include <netinet/ip.h>
+extern void goPacketCallback(struct packet_info*);
+
+static void packet_bridge(struct packet_info *info) {
+    goPacketCallback(info);
+}
 */
 import "C"
 import (
 	"fmt"
+	"net"
 	"unsafe"
 )
 
+type Packet struct {
+	SrcIP 	string
+	DstIP 	string
+	SrcPort int
+	DstPort int
+	Proto 	string
+	SNI 	string
+}
+
+var packetHandler func(Packet)
+
+//export goPacketCallback
+func goPacketCallback(info *C.struct_packet_info) {
+	p := Packet{
+		SrcIP:   ipToString(info.src_ip),
+		DstIP:   ipToString(info.dst_ip),
+		SrcPort: int(info.src_port),
+		DstPort: int(info.dst_port),
+		Proto:   protoName(info),
+		SNI:     C.GoString(&info.sni[0]),
+	}
+
+	fmt.Printf("[%s]: %s:%d -> %s:%d \n", p.Proto, p.SrcIP, p.SrcPort, p.DstIP, p.DstPort)
+
+	if packetHandler != nil {
+		packetHandler(p)
+	}
+}
+
+func ipToString(ip C.uint32_t) string {
+	b := []byte{
+		byte(ip >> 24),
+		byte(ip >> 16),
+		byte(ip >> 8),
+		byte(ip),
+	}
+	return net.IP(b).String()
+}
 
 func protoName(info *C.struct_packet_info) string {
 	if info.proto == C.IPPROTO_TCP {
@@ -54,8 +98,12 @@ func ChooseInterface() string {
 	return deviceName
 }
 
-func Start (iface string, pcb C.packet_cb, dcb C.dnc_cb) {
+func Start (iface string, handler func(Packet)) {
 	cIface := C.CString(iface)
 	defer C.free(unsafe.Pointer(&cIface))
-	C.start_capture(cIface, pcb, dcb)
+	C.start_capture(
+		cIface,
+		(C.packet_cb_t)(C.goPacketCallback), 
+		nil,
+	)
 }

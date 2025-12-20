@@ -1,5 +1,4 @@
 #include "capture.h"
-#include "dns.h"
 
 #include <pcap.h>
 
@@ -83,7 +82,7 @@ void handler(
 	const u_char *bytes
 ) {
 	struct callback_data *data = (struct callback_data *)user;
-	if(!data || !data->cb) return;
+	if(!data || !data->packet_cb) return;
 
 	if(h->caplen < sizeof(struct ether_header) + sizeof(struct iphdr))
 		return;
@@ -104,21 +103,20 @@ void handler(
 	if(h->caplen < sizeof(struct ether_header) + ip_header_len + sizeof(struct tcphdr))
 		return;
 	
-	struct packet_info info;
-	
+	struct packet_info info;	
 	memset(&info, 0, sizeof(info));
 	
+	info.src_ip = ip->saddr;
+	info.dst_ip = ip->daddr;
+	info.proto = ip->protocol;
 	if(ip->protocol == IPPROTO_TCP){
 		struct tcphdr *tcp = (struct tcphdr *)(
 			bytes + sizeof(struct ether_header) + ip_header_len
 		);
 		int tcp_header_len = tcp->doff * 4;
 
-		info.src_ip	= ip->saddr;
-		info.dst_ip 	= ip->daddr;
 		info.src_port	= ntohs(tcp->source);
 		info.dst_port 	= ntohs(tcp->dest);
-		info.proto 	= ip->protocol;
 		
 		const u_char *payload = bytes 
 			+ sizeof(struct ether_header)
@@ -143,24 +141,11 @@ void handler(
 		uint16_t src = ntohs(udp->source);
 		uint16_t dst = ntohs(udp->dest);
 		
-		info.src_ip 	= ip->saddr;
-		info.dst_ip 	= ip->daddr;
 		info.src_port 	= src;
 		info.dst_port	= dst;
-		info.proto 	= ip->protocol;
 		
-		if(src == 53 || dst == 53){
-			const unsigned char *dns =
-				bytes
-				+ sizeof(struct ether_header)
-				+ ip_header_len
-				+ sizeof(struct udphdr);
-
-			int dns_len = h->caplen - (dns - bytes);
-			parse_dns(dns, dns_len);
-		}
 	}
-	data->cb(&info);
+	data->packet_cb(&info);
 }
 
 int start_capture(const char* iface, packet_cb_t p_cb, dns_cb_t d_cb){
@@ -182,7 +167,8 @@ int start_capture(const char* iface, packet_cb_t p_cb, dns_cb_t d_cb){
 		return -1;
 	}
 
-	data->cb = packet_bridge;
+	data->packet_cb = p_cb;
+	data->dns_cb = d_cb;
 
 	pcap_loop(handle, 0, handler, (u_char*)data);
 	pcap_close(handle);

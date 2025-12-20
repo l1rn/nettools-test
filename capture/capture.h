@@ -20,11 +20,21 @@ typedef void (*packet_cb_t)(struct packet_info*);
 typedef void (*dns_cb_t)(const char*);
 
 struct callback_data {
-	packet_cb cb;
+	packet_cb_t packet_cb;
+	dns_cb_t dns_cb;
 };
 
-void 	handler(unsigned char *user, const struct pcap_pkthdr *h, const unsigned char *bytes);
-int 	start_capture(const char* iface, packet_cb_t p_cb, dns_cb_t d_cb);
+void 	handler(
+	unsigned char *user, 
+	const struct pcap_pkthdr *h, 
+	const unsigned char *bytes
+);
+int 	start_capture(
+	const char* iface, 
+	packet_cb_t p_cb, 
+	dns_cb_t d_cb
+);
+
 void 	print_possible_devices();
 char* 	choose_device(int key);
 #endif
